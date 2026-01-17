@@ -3,455 +3,265 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CONSTRUCTION RENTAL MANAGER PRO + AI</title>
+    <title>CONSTRUCTION RENTAL MANAGER - DB FIX</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;800&display=swap');
-        body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; color: #1e293b; -webkit-tap-highlight-color: transparent; overflow-x: hidden; }
-        
-        /* 스크롤바 커스텀 */
-        .pipeline-scroll::-webkit-scrollbar { height: 4px; }
-        .pipeline-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        
-        /* 단계별 색상 정의 */
-        .step-영업 { border-left-color: #fbbf24; }
-        .step-도면수령 { border-left-color: #f59e0b; }
-        .step-도면작업 { border-left-color: #3b82f6; }
-        .step-견적 { border-left-color: #6366f1; }
-        .step-계약 { border-left-color: #10b981; }
-        .step-자재투입 { border-left-color: #ef4444; }
-        .step-기성정리 { border-left-color: #8b5cf6; }
-        .step-자재반납 { border-left-color: #64748b; }
-        .step-정산 { border-left-color: #0f172a; }
-        
-        /* 로딩 애니메이션 및 오버레이 차단 해제 */
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800&display=swap');
+        body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; color: #1e293b; -webkit-tap-highlight-color: transparent; }
         #auth-loading { position: fixed; inset: 0; background: white; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .loader { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #2563eb; border-radius: 50%; animation: spin 1s linear infinite; }
+        .loader { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        /* 모달 애니메이션 */
-        .modal-enter { transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
-        .modal-active { transform: translateY(0); }
-
-        /* 클릭 가능 요소 및 터치 영역 확보 */
-        .clickable { cursor: pointer; position: relative; z-index: 50; isolation: isolate; }
-        .clickable:active { transform: scale(0.92); }
-        
-        /* 하단 바 터치 간섭 방지 */
-        nav { pointer-events: none; }
-        nav > div { pointer-events: auto; }
+        .clickable { cursor: pointer; transition: transform 0.1s; }
+        .clickable:active { transform: scale(0.95); }
     </style>
 </head>
-<body class="min-h-screen pb-40"> 
+<body class="min-h-screen pb-24">
 
-<!-- 인증 전 화면 가림막 -->
 <div id="auth-loading">
     <div class="loader mb-4"></div>
-    <p class="text-sm font-bold text-gray-500">Connecting to Database...</p>
+    <p id="loading-status" class="text-sm font-bold text-gray-500">데이터베이스 연결 중...</p>
 </div>
 
-<div id="app" class="max-w-2xl mx-auto hidden opacity-0 transition-opacity duration-300">
-    <!-- Header -->
-    <header class="bg-white/80 backdrop-blur-md border-b border-gray-100 px-6 py-5 sticky top-0 z-40">
-        <div class="flex justify-between items-center">
-            <div>
-                <h1 class="text-xl font-extrabold tracking-tight text-slate-900 uppercase">Rental Manager</h1>
-                <p id="today-display" class="text-[11px] text-blue-600 font-bold mt-0.5 tracking-tighter"></p>
-            </div>
-            <div class="flex items-center gap-3">
-                <!-- 현장 추가 버튼 (헤더) -->
-                <button onclick="window.openAddSite()" class="clickable bg-slate-900 text-white p-2.5 rounded-xl shadow-lg">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
-                </button>
-            </div>
+<div id="app" class="max-w-2xl mx-auto hidden transition-opacity duration-500 opacity-0">
+    <header class="bg-white border-b px-6 py-5 sticky top-0 z-40 flex justify-between items-center">
+        <div>
+            <h1 class="text-lg font-black text-slate-900 uppercase tracking-tight">Rental Manager</h1>
+            <p id="status-tag" class="text-[10px] text-green-600 font-bold uppercase">● Online / Connected</p>
         </div>
+        <button onclick="window.openAddSite()" class="clickable bg-indigo-600 text-white p-2.5 rounded-xl shadow-lg">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+        </button>
     </header>
 
-    <!-- Main Viewport -->
     <main id="viewport" class="p-5 space-y-6"></main>
 
-    <!-- Navigation -->
-    <nav class="fixed bottom-0 left-0 right-0 z-[60] pb-6 px-6">
-        <div class="max-w-md mx-auto bg-white/90 backdrop-blur-xl border border-gray-100 rounded-3xl shadow-2xl flex justify-between items-center px-8 py-4 relative">
-            <button onclick="window.nav('dashboard')" class="nav-btn flex flex-col items-center gap-1 transition-colors" data-id="dashboard">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+    <nav class="fixed bottom-0 left-0 right-0 z-50 p-4 bg-gradient-to-t from-white via-white/90 to-transparent">
+        <div class="max-w-md mx-auto bg-slate-900 rounded-3xl shadow-2xl flex justify-around items-center py-4">
+            <button onclick="window.nav('dashboard')" class="text-white/50 hover:text-white flex flex-col items-center gap-1" id="nav-dashboard">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
                 <span class="text-[9px] font-bold">홈</span>
             </button>
-            <button onclick="window.nav('pipeline')" class="nav-btn flex flex-col items-center gap-1 transition-colors text-gray-400" data-id="pipeline">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                <span class="text-[9px] font-bold">공정</span>
+            <button onclick="window.nav('sites')" class="text-white/50 hover:text-white flex flex-col items-center gap-1" id="nav-sites">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                <span class="text-[9px] font-bold">현장목록</span>
             </button>
-            
-            <!-- 로그 작성 플로팅 버튼 -->
-            <button onclick="window.openLogForm()" class="clickable bg-indigo-600 text-white p-4 rounded-2xl shadow-xl shadow-indigo-200 -mt-12 border-4 border-white">
+            <button onclick="window.openLogForm()" class="bg-white text-slate-900 p-3 rounded-2xl shadow-lg -mt-8 border-4 border-slate-900">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="3" d="M12 4v16m8-8H4"></path></svg>
             </button>
-
-            <button onclick="window.nav('sites')" class="nav-btn flex flex-col items-center gap-1 transition-colors text-gray-400" data-id="sites">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                <span class="text-[9px] font-bold">현장</span>
+            <button onclick="window.nav('pipeline')" class="text-white/50 hover:text-white flex flex-col items-center gap-1" id="nav-pipeline">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                <span class="text-[9px] font-bold">통계</span>
             </button>
-            <button onclick="window.render()" class="nav-btn flex flex-col items-center gap-1 transition-colors text-gray-400">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            <button onclick="location.reload()" class="text-white/50 hover:text-white flex flex-col items-center gap-1">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                 <span class="text-[9px] font-bold">새로고침</span>
             </button>
         </div>
     </nav>
 
-    <!-- Modal System -->
-    <div id="modal-overlay" class="fixed inset-0 bg-slate-900/60 z-[100] hidden flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm transition-opacity duration-300">
-        <div id="modal-container" class="bg-white w-full max-w-lg rounded-t-[2.5rem] sm:rounded-3xl overflow-hidden shadow-2xl modal-enter">
-            <div class="px-6 py-5 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
-                <h3 id="modal-title" class="font-extrabold text-slate-800 tracking-tight"></h3>
-                <button onclick="window.closeModal()" class="text-slate-400 p-2 hover:bg-gray-100 rounded-full transition-colors">✕</button>
+    <!-- Modal -->
+    <div id="modal-overlay" class="fixed inset-0 bg-black/50 z-[100] hidden backdrop-blur-sm flex items-end justify-center">
+        <div id="modal-content" class="bg-white w-full max-w-lg rounded-t-[2rem] p-6 shadow-2xl transition-transform duration-300 translate-y-full">
+            <div class="flex justify-between items-center mb-6">
+                <h3 id="modal-title" class="text-lg font-black"></h3>
+                <button onclick="window.closeModal()" class="p-2 text-gray-400">✕</button>
             </div>
-            <div id="modal-body" class="p-6 max-h-[80vh] overflow-y-auto"></div>
+            <div id="modal-body"></div>
         </div>
     </div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
     import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
+    // Global Configs
     const firebaseConfig = JSON.parse(__firebase_config);
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
-    const appId = typeof __app_id !== 'undefined' ? __app_id : "construction-rental-v1";
-    const apiKey = ""; 
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'rental-app-v2';
 
-    const STEPS = ["영업", "도면수령", "도면작업", "견적", "계약", "자재투입", "기성정리", "자재반납", "정산"];
     window.state = { user: null, view: 'dashboard', sites: [], logs: [], initialized: false };
+    const STEPS = ["영업", "도면수령", "도면작업", "견적", "계약", "자재투입", "기성정리", "자재반납", "정산"];
 
-    async function callGemini(prompt, systemPrompt = "") {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-        const payload = {
-            contents: [{ parts: [{ text: prompt }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] }
-        };
+    // RULE 3: Auth Before Queries
+    const login = async () => {
         try {
-            const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            const result = await resp.json();
-            return result.candidates?.[0]?.content?.parts?.[0]?.text || "분석 정보를 가져올 수 없습니다.";
-        } catch (e) { return "AI 연결 일시적 장애"; }
-    }
-
-    // AUTH LOGIC (RULE 3)
-    const initAuth = async () => {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-            await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-            await signInAnonymously(auth);
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                await signInAnonymously(auth);
+            }
+        } catch (e) {
+            console.error("Auth Error:", e);
+            document.getElementById('loading-status').innerText = "접속 권한 확인 중 오류 발생...";
         }
     };
-    initAuth();
 
     onAuthStateChanged(auth, (user) => {
         if (user) {
             window.state.user = user;
-            
-            // 로딩 오버레이 제거 (클릭 차단 해제)
+            initDataSync();
+            // 화면 표시
             const loader = document.getElementById('auth-loading');
-            const appEl = document.getElementById('app');
-            if(loader) {
-                loader.style.display = 'none'; // DOM에서 즉시 제거
-            }
-            if(appEl) {
-                appEl.classList.remove('hidden');
-                setTimeout(() => appEl.classList.add('opacity-100'), 50);
-            }
-            
-            const dateDisplay = document.getElementById('today-display');
-            if(dateDisplay) dateDisplay.innerText = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' });
-            
-            initSync();
+            const appContainer = document.getElementById('app');
+            loader.style.display = 'none';
+            appContainer.classList.remove('hidden');
+            setTimeout(() => appContainer.classList.add('opacity-100'), 50);
+        } else {
+            login();
         }
     });
 
-    function initSync() {
+    // RULE 1 & 2: Firestore Sync
+    function initDataSync() {
         if (window.state.initialized || !window.state.user) return;
-        
-        // RULE 1: Strict Paths
+
+        // Public Data Path (RULE 1)
         const sitesRef = collection(db, 'artifacts', appId, 'public', 'data', 'sites');
         const logsRef = collection(db, 'artifacts', appId, 'public', 'data', 'logs');
 
+        // Simple queries (RULE 2 - no complex orderBy yet for stability)
         onSnapshot(sitesRef, (snap) => {
-            window.state.sites = snap.docs.map(d => d.data()).sort((a,b) => b.createdAt - a.createdAt);
+            window.state.sites = snap.docs.map(d => ({...d.data(), id: d.id}));
             render();
         }, (err) => console.error("Sites Sync Error:", err));
 
         onSnapshot(logsRef, (snap) => {
-            window.state.logs = snap.docs.map(d => d.data()).sort((a,b) => b.createdAt - a.createdAt);
+            window.state.logs = snap.docs.map(d => ({...d.data(), id: d.id})).sort((a,b) => b.createdAt - a.createdAt);
             render();
         }, (err) => console.error("Logs Sync Error:", err));
 
         window.state.initialized = true;
     }
 
-    window.nav = (v, id = null) => {
-        window.state.view = v;
-        window.state.activeId = id;
+    // Navigation & Rendering
+    window.nav = (view) => {
+        window.state.view = view;
         render();
     };
 
     window.render = () => {
         const vp = document.getElementById('viewport');
-        const view = window.state.view;
         if (!vp) return;
 
-        document.querySelectorAll('.nav-btn').forEach(btn => {
-            const active = btn.dataset.id === view;
-            btn.classList.toggle('text-indigo-600', active);
-            btn.classList.toggle('text-gray-400', !active);
-        });
-
-        if (view === 'dashboard') renderDashboard(vp);
-        else if (view === 'pipeline') renderPipeline(vp);
-        else if (view === 'sites') renderSiteList(vp);
-        else if (view === 'site-detail') renderSiteDetail(vp);
-    }
+        if (window.state.view === 'dashboard') {
+            renderDashboard(vp);
+        } else if (window.state.view === 'sites') {
+            renderSites(vp);
+        } else if (window.state.view === 'pipeline') {
+            renderPipeline(vp);
+        }
+    };
 
     function renderDashboard(el) {
-        const logs = window.state.logs.slice(0, 5);
-        const activeCount = window.state.sites.filter(s => s.step !== '정산').length;
-        const todayStr = new Date().toLocaleDateString('ko-KR');
-
+        const activeSites = window.state.sites.filter(s => s.step !== '정산').length;
         el.innerHTML = `
-            <div class="grid grid-cols-2 gap-4">
-                <div class="bg-indigo-600 p-6 rounded-[2rem] text-white shadow-xl shadow-indigo-100">
-                    <p class="text-[10px] font-bold opacity-70 uppercase tracking-widest">Active Sites</p>
-                    <p class="text-3xl font-black mt-1">${activeCount}</p>
-                </div>
-                <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Today Logs</p>
-                    <p class="text-3xl font-black mt-1 text-slate-800">${window.state.logs.filter(l => l.date === todayStr).length}</p>
-                </div>
+            <div class="bg-indigo-600 p-6 rounded-[2rem] text-white shadow-xl">
+                <p class="text-[10px] font-bold opacity-70 uppercase tracking-widest">진행 중인 현장</p>
+                <p class="text-4xl font-black mt-1">${activeSites}</p>
             </div>
             
-            <section class="bg-slate-900 p-6 rounded-[2rem] text-white">
-                <div class="flex items-center gap-2 mb-3">
-                    <span class="text-lg">🤖</span>
-                    <h3 class="text-xs font-black text-indigo-300 uppercase tracking-wider">AI Report</h3>
-                </div>
-                <p id="ai-dashboard-summary" class="text-[12px] font-medium leading-relaxed text-slate-300">업무 데이터를 분석하고 있습니다...</p>
-            </section>
-
             <section class="space-y-4">
-                <h3 class="text-sm font-black text-slate-800 px-1">최근 업무 히스토리</h3>
-                ${logs.map(l => `
-                    <div onclick="window.nav('site-detail', '${l.siteId}')" class="clickable bg-white p-5 rounded-3xl border-l-8 step-${l.cat} shadow-sm border border-slate-50 transition-all">
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="text-[10px] font-black text-slate-400 uppercase truncate max-w-[140px]">${l.siteName}</span>
-                            <span class="text-[9px] font-black px-2 py-0.5 rounded bg-slate-50 text-slate-500 border border-slate-100">${l.cat}</span>
+                <h3 class="text-sm font-black text-slate-800 px-1">최근 업무 로그</h3>
+                ${window.state.logs.slice(0, 5).map(l => `
+                    <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-[10px] font-black text-indigo-600 uppercase">${l.siteName}</span>
+                            <span class="text-[9px] text-slate-300 font-bold">${l.date}</span>
                         </div>
-                        <p class="text-[14px] font-bold text-slate-700 leading-snug">${l.content}</p>
-                        <p class="text-[9px] text-slate-300 font-bold mt-3 uppercase tracking-tighter">${l.date}</p>
+                        <p class="text-sm font-bold text-slate-700 leading-snug">${l.content}</p>
                     </div>
-                `).join('') || `<div class="py-20 text-center text-xs text-slate-300 font-bold italic">기록된 데이터가 없습니다.</div>`}
+                `).join('') || '<p class="text-center py-10 text-xs text-slate-300 font-bold italic">로그가 없습니다.</p>'}
             </section>
         `;
-        updateDashboardSummary();
     }
 
-    async function updateDashboardSummary() {
-        const container = document.getElementById('ai-dashboard-summary');
-        if (!container || window.state.logs.length === 0) return;
-        const recentLogs = window.state.logs.slice(0, 10).map(l => `[${l.siteName}] ${l.content}`).join('\n');
-        const summary = await callGemini(recentLogs, "건설 비서로서 오늘 주요 상황을 100자 내 요약해줘.");
-        if (container) container.innerText = summary;
+    function renderSites(el) {
+        el.innerHTML = `
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-sm font-black text-slate-800 uppercase tracking-widest">전체 현장 목록</h3>
+            </div>
+            <div class="grid gap-3">
+                ${window.state.sites.map(s => `
+                    <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex justify-between items-center">
+                        <div>
+                            <h4 class="font-bold text-slate-800">${s.name}</h4>
+                            <p class="text-[10px] text-slate-400 font-bold">${s.company || '발주처 미정'}</p>
+                        </div>
+                        <span class="text-[9px] font-black px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 uppercase">${s.step || '영업'}</span>
+                    </div>
+                `).join('')}
+                <button onclick="window.openAddSite()" class="w-full py-8 border-2 border-dashed border-slate-200 rounded-3xl text-slate-300 font-bold text-xs hover:bg-slate-50">+ 현장 추가</button>
+            </div>
+        `;
     }
 
     function renderPipeline(el) {
-        el.innerHTML = `
-            <h3 class="text-sm font-black text-slate-800 mb-6 px-1 uppercase tracking-tight">Status Pipeline</h3>
-            <div class="space-y-8">
-                ${STEPS.map(step => {
-                    const stepSites = window.state.sites.filter(s => (s.step || '영업') === step);
-                    return `
-                        <div>
-                            <div class="flex justify-between items-center mb-3 px-1 border-l-4 border-slate-200 pl-3">
-                                <span class="text-xs font-extrabold text-slate-700">${step}</span>
-                                <span class="text-[10px] font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded-full">${stepSites.length}</span>
-                            </div>
-                            <div class="flex flex-nowrap overflow-x-auto gap-4 pb-2 pipeline-scroll">
-                                ${stepSites.map(s => `
-                                    <div onclick="window.nav('site-detail', '${s.id}')" class="clickable shrink-0 bg-white border border-slate-100 p-5 rounded-2xl shadow-sm w-44 hover:border-indigo-200 transition-colors">
-                                        <p class="text-xs font-black text-slate-800 truncate mb-1">${s.name}</p>
-                                        <p class="text-[9px] font-bold text-slate-400 truncate">${s.company || '업체미지정'}</p>
-                                    </div>
-                                `).join('') || '<div class="text-[10px] text-slate-200 font-bold py-2 px-1 italic">현장 없음</div>'}
-                            </div>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-        `;
-    }
-
-    function renderSiteList(el) {
-        el.innerHTML = `
-            <div class="flex justify-between items-center mb-6 px-1">
-                <h3 class="text-sm font-black text-slate-800 uppercase tracking-widest">Site Directory</h3>
-            </div>
-            <div class="grid gap-4">
-                ${window.state.sites.map(s => `
-                    <div onclick="window.nav('site-detail', '${s.id}')" class="clickable bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-                        <div class="flex justify-between items-center">
-                            <div class="max-w-[70%]">
-                                <h4 class="font-black text-base text-slate-800 leading-tight">${s.name}</h4>
-                                <p class="text-[10px] text-slate-400 font-bold mt-1 tracking-wider">${s.company || 'No Company Info'}</p>
-                            </div>
-                            <span class="text-[9px] font-black px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-600 uppercase border border-indigo-100">${s.step || '영업'}</span>
-                        </div>
+        el.innerHTML = `<h3 class="text-sm font-black text-slate-800 mb-6 uppercase tracking-tight">공정별 현황</h3>`;
+        STEPS.forEach(step => {
+            const stepSites = window.state.sites.filter(s => s.step === step);
+            el.innerHTML += `
+                <div class="mb-4">
+                    <div class="flex justify-between mb-2 px-1">
+                        <span class="text-xs font-bold text-slate-600">${step}</span>
+                        <span class="text-[10px] font-black text-slate-300">${stepSites.length}개</span>
                     </div>
-                `).join('')}
-                <button onclick="window.openAddSite()" class="clickable w-full py-12 border-2 border-dashed border-slate-200 rounded-[2rem] text-slate-300 font-black text-xs bg-white/50 hover:bg-white hover:text-indigo-400 hover:border-indigo-200 transition-all">
-                    + ADD NEW PROJECT
-                </button>
-            </div>
-        `;
-    }
-
-    function renderSiteDetail(el) {
-        const site = window.state.sites.find(s => s.id === window.state.activeId);
-        if(!site) return window.nav('sites');
-        const logs = window.state.logs.filter(l => l.siteId === site.id);
-
-        el.innerHTML = `
-            <div class="flex items-center gap-4 mb-6">
-                <button onclick="window.nav('sites')" class="clickable bg-white p-3 rounded-2xl border border-slate-100 shadow-sm text-slate-400">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="3" d="M15 19l-7-7 7-7"></path></svg>
-                </button>
-                <div>
-                    <h2 class="font-black text-lg text-slate-800 leading-tight">${site.name}</h2>
-                    <p class="text-[10px] font-bold text-slate-400">${site.company || '발주처 정보 없음'}</p>
-                </div>
-            </div>
-
-            <div class="bg-gradient-to-br from-indigo-600 to-indigo-800 p-6 rounded-[2.5rem] text-white shadow-xl mb-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h4 class="text-[10px] font-black uppercase tracking-widest opacity-80">Site Analysis</h4>
-                    <span class="text-[9px] px-2 py-0.5 rounded-full bg-white/20 font-bold">AI PRO</span>
-                </div>
-                <div id="ai-site-analysis"><p class="text-[13px] font-bold italic opacity-60">데이터 분석을 요청 중...</p></div>
-            </div>
-
-            <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm mb-8">
-                <label class="text-[9px] font-black text-slate-300 uppercase block mb-4 tracking-widest text-center">Current Project Phase</label>
-                <div class="grid grid-cols-3 gap-2">
-                    ${STEPS.map(st => `
-                        <button onclick="window.updateSiteStep('${site.id}', '${st}')" 
-                                class="clickable py-3 rounded-2xl text-[10px] font-black transition-all border
-                                ${site.step === st ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-slate-50 text-slate-300 border-slate-50'}">
-                            ${st}
-                        </button>
-                    `).join('')}
-                </div>
-            </div>
-
-            <section class="space-y-4">
-                <div class="flex justify-between items-center mb-2 px-1">
-                    <h3 class="text-sm font-black text-slate-800 uppercase tracking-tight">Timeline</h3>
-                    <button onclick="window.openLogForm('${site.id}')" class="clickable text-[11px] font-black text-indigo-600 bg-indigo-50 px-4 py-2 rounded-2xl">+ LOG</button>
-                </div>
-                ${logs.map(l => `
-                    <div class="bg-white p-5 rounded-3xl border border-slate-50 shadow-sm">
-                        <div class="flex justify-between items-center mb-3">
-                            <span class="text-[9px] font-black px-2 py-0.5 rounded-md bg-slate-900 text-white uppercase">${l.cat}</span>
-                            <span class="text-[9px] text-slate-300 font-extrabold uppercase">${l.date}</span>
-                        </div>
-                        <p class="text-[14px] font-bold text-slate-700 leading-relaxed">${l.content}</p>
+                    <div class="flex gap-2 overflow-x-auto pb-2">
+                        ${stepSites.map(s => `<div class="bg-white p-3 rounded-xl border border-slate-100 shadow-sm shrink-0 min-w-[120px] text-[11px] font-bold text-slate-700">${s.name}</div>`).join('') || '<div class="text-[10px] text-slate-200 italic">비어있음</div>'}
                     </div>
-                `).join('') || '<div class="text-center py-20 text-[11px] font-bold text-slate-300 italic">히스토리가 비어있습니다.</div>'}
-            </section>
-        `;
-        updateSiteAI(site, logs);
+                </div>
+            `;
+        });
     }
 
-    async function updateSiteAI(site, logs) {
-        const analysisEl = document.getElementById('ai-site-analysis');
-        if (!analysisEl || logs.length === 0) return;
-        const logCtx = logs.map(l => l.content).join(', ');
-        const summary = await callGemini(`현장:${site.name}, 로그:${logCtx}`, "이 현장의 리스크와 현황을 80자 내로 전문가처럼 요약해줘.");
-        if(analysisEl) analysisEl.innerHTML = `<p class="text-[14px] font-bold leading-snug">${summary}</p>`;
-    }
-
+    // Modal & Data Write
     window.openAddSite = () => {
         window.openModal('현장 신규 등록', `
-            <div class="space-y-5">
-                <div>
-                    <label class="text-[10px] font-black text-slate-400 mb-2 block ml-1 uppercase">Site Name</label>
-                    <input id="s-name" type="text" placeholder="예: 한강 자이 공사현장" class="w-full p-4 rounded-2xl bg-slate-50 border-none text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-100">
-                </div>
-                <div>
-                    <label class="text-[10px] font-black text-slate-400 mb-2 block ml-1 uppercase">Client / Company</label>
-                    <input id="s-company" type="text" placeholder="예: (주)현대건설" class="w-full p-4 rounded-2xl bg-slate-50 border-none text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-100">
-                </div>
-                <button onclick="window.saveSite()" class="clickable w-full py-5 bg-slate-900 text-white rounded-3xl text-xs font-black uppercase tracking-[0.2em] shadow-2xl mt-4">Create Project</button>
+            <div class="space-y-4">
+                <input id="s-name" type="text" placeholder="현장 이름" class="w-full p-4 rounded-2xl bg-slate-50 border-none text-sm font-bold">
+                <input id="s-company" type="text" placeholder="발주처" class="w-full p-4 rounded-2xl bg-slate-50 border-none text-sm font-bold">
+                <button onclick="window.saveSite()" class="w-full py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest">저장하기</button>
             </div>
         `);
     };
 
     window.saveSite = async () => {
-        if (!window.state.user) return;
         const name = document.getElementById('s-name').value.trim();
-        if (!name) return;
-        const id = 'S' + Date.now();
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sites', id), {
-            id, name, company: document.getElementById('s-company').value,
-            step: "영업", createdAt: Date.now()
+        if (!name || !window.state.user) return;
+        const siteId = 'S' + Date.now();
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sites', siteId), {
+            id: siteId, name, company: document.getElementById('s-company').value,
+            step: '영업', createdAt: Date.now()
         });
         window.closeModal();
     };
 
-    window.updateSiteStep = async (id, step) => {
-        if (!window.state.user) return;
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sites', id), { step });
-    }
-
-    window.openLogForm = (preSiteId = '') => {
-        window.openModal('업무 로그 작성', `
-            <div class="space-y-5">
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="text-[10px] font-black text-slate-400 mb-2 block ml-1">현장 선택</label>
-                        <select id="l-site" class="w-full p-4 rounded-2xl bg-slate-50 border-none text-sm font-bold outline-none appearance-none">
-                            ${window.state.sites.map(s => `<option value="${s.id}" ${preSiteId === s.id ? 'selected' : ''}>${s.name}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="text-[10px] font-black text-slate-400 mb-2 block ml-1">공정 단계</label>
-                        <select id="l-cat" class="w-full p-4 rounded-2xl bg-slate-50 border-none text-sm font-bold outline-none appearance-none">
-                            ${STEPS.map(st => `<option>${st}</option>`).join('')}
-                        </select>
-                    </div>
-                </div>
-                <div>
-                    <label class="text-[10px] font-black text-slate-400 mb-2 block ml-1 uppercase">Activity Details</label>
-                    <textarea id="l-content" placeholder="오늘 어떤 업무가 진행되었나요?" class="w-full p-5 rounded-2xl bg-slate-50 border-none text-sm font-bold h-40 outline-none focus:ring-2 focus:ring-indigo-100"></textarea>
-                </div>
-                <button onclick="window.saveLog()" class="clickable w-full py-5 bg-indigo-600 text-white rounded-3xl text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100">Save Timeline</button>
+    window.openLogForm = () => {
+        window.openModal('업무 기록 작성', `
+            <div class="space-y-4">
+                <select id="l-site" class="w-full p-4 rounded-2xl bg-slate-50 border-none text-sm font-bold">
+                    ${window.state.sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+                </select>
+                <textarea id="l-content" placeholder="업무 내용" class="w-full p-4 rounded-2xl bg-slate-50 border-none text-sm font-bold h-32"></textarea>
+                <button onclick="window.saveLog()" class="w-full py-4 bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest">기록 저장</button>
             </div>
         `);
     };
 
     window.saveLog = async () => {
-        if (!window.state.user) return;
         const siteId = document.getElementById('l-site').value;
         const content = document.getElementById('l-content').value.trim();
-        if (!siteId || !content) return;
+        if (!siteId || !content || !window.state.user) return;
         
-        const site = window.state.sites.find(s=>s.id === siteId);
-        const cat = document.getElementById('l-cat').value;
-        const id = 'L' + Date.now();
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'logs', id), {
-            id, siteId, siteName: site.name, cat,
-            date: new Date().toLocaleDateString('ko-KR'), 
-            createdAt: Date.now(), content
+        const site = window.state.sites.find(s => s.id === siteId);
+        const logId = 'L' + Date.now();
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'logs', logId), {
+            id: logId, siteId, siteName: site.name, content,
+            date: new Date().toLocaleDateString('ko-KR'), createdAt: Date.now()
         });
-        await window.updateSiteStep(siteId, cat);
         window.closeModal();
     };
 
@@ -459,17 +269,19 @@
         document.getElementById('modal-title').innerText = title;
         document.getElementById('modal-body').innerHTML = html;
         const overlay = document.getElementById('modal-overlay');
+        const content = document.getElementById('modal-content');
         overlay.classList.remove('hidden');
-        setTimeout(() => document.getElementById('modal-container').classList.add('modal-active'), 10);
+        setTimeout(() => content.classList.remove('translate-y-full'), 10);
     };
 
     window.closeModal = () => {
-        document.getElementById('modal-container').classList.remove('modal-active');
+        const content = document.getElementById('modal-content');
+        content.classList.add('translate-y-full');
         setTimeout(() => document.getElementById('modal-overlay').classList.add('hidden'), 300);
     };
 
-    // 초기 렌더링
-    window.render();
+    // 초기 실행
+    login();
 
 </script>
 </body>
