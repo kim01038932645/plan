@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>현장 통합 관리 시스템</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800&display=swap');
+        body { font-family: 'Pretendard', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .tab-btn.active { color: #4f46e5; border-bottom: 2px solid #4f46e5; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .animate-slide-up { animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: #f1f5f9; border: 1px solid #f1f5f9; }
+        .calendar-day { background: white; min-height: 90px; padding: 6px; font-size: 11px; cursor: pointer; transition: background 0.2s; position: relative; }
+        .calendar-day.today { background: #eef2ff; color: #4f46e5; font-weight: 800; }
+        
+        .form-label { font-size: 11px; font-weight: 800; color: #64748b; margin-bottom: 4px; display: block; padding-left: 4px; }
+        .form-input { width: 100%; background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 10px; padding: 10px 14px; font-size: 13px; outline: none; }
+        .form-input:focus { border-color: #4f46e5; background: white; }
+
+        .date-nav-btn { width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; background: #f1f5f9; border-radius: 50%; color: #4f46e5; transition: all 0.2s; }
+        
+        .asset-box { width: 100%; aspect-ratio: 16/9; background: #f8fafc; border: 2px dashed #e2e8f0; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; overflow: hidden; }
+        .asset-box img { width: 100%; height: 100%; object-fit: cover; }
+        
+        .table-header { background: #f1f5f9; font-size: 10px; font-weight: 800; color: #475569; padding: 8px; text-align: center; }
+        .table-cell { border-bottom: 1px solid #f1f5f9; padding: 4px; font-size: 11px; text-align: center; }
+        .table-input { width: 100%; background: transparent; text-align: center; outline: none; font-size: 11px; padding: 4px 2px; }
+        .table-sum { background: #fefce8; font-weight: 800; color: #854d0e; }
+
+        .cat-filter-btn { padding: 8px 16px; border-radius: 12px; font-size: 12px; font-weight: 800; transition: all 0.2s; flex-shrink: 0; border: 1px solid #f1f5f9; background: white; color: #94a3b8; }
+        .cat-filter-btn.active { background: #4f46e5; color: white; border-color: #4f46e5; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+<div id="app" class="max-w-md mx-auto min-h-screen flex flex-col bg-white shadow-2xl relative overflow-hidden">
+    
+    <header class="p-4 border-b border-slate-100 bg-white sticky top-0 z-[60]">
+        <div class="flex justify-between items-center">
+            <div>
+                <span class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Site Master Pro</span>
+                <h1 class="text-xl font-black text-slate-800 tracking-tight">현장 통합 관리</h1>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="showView('list', 'task')" class="p-2.5 bg-indigo-50 rounded-xl text-indigo-600">
+                    <i data-lucide="clipboard-list" class="w-6 h-6"></i>
+                </button>
+                <button onclick="toggleTodoView()" class="p-2.5 bg-rose-50 rounded-xl text-rose-500 relative">
+                    <i data-lucide="check-circle" class="w-6 h-6"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto pb-24">
+        <!-- Calendar View -->
+        <div id="view-calendar" class="view-section p-4">
+            <div class="flex justify-between items-center mb-4 px-1">
+                <h2 id="calendar-month" class="font-black text-lg text-slate-800 underline decoration-indigo-200 decoration-4 underline-offset-4">2024년 5월</h2>
+                <div class="flex gap-1">
+                    <button onclick="changeMonth(-1)" class="p-2 hover:bg-slate-100 rounded-lg"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+                    <button onclick="changeMonth(1)" class="p-2 hover:bg-slate-100 rounded-lg"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+                </div>
+            </div>
+            <div class="calendar-grid rounded-2xl overflow-hidden border-none shadow-sm" id="calendar-container"></div>
+        </div>
+
+        <!-- List View -->
+        <div id="view-list" class="view-section hidden p-4">
+            <div class="flex border-b border-slate-100 mb-4 overflow-x-auto no-scrollbar gap-2 items-center">
+                <button onclick="setListTab('site')" id="tab-site" class="tab-btn px-4 py-2 text-sm font-black text-slate-400 shrink-0">현장</button>
+                <button onclick="setListTab('company')" id="tab-company" class="tab-btn px-4 py-2 text-sm font-black text-slate-400 shrink-0">업체</button>
+                <button onclick="setListTab('manager')" id="tab-manager" class="tab-btn px-4 py-2 text-sm font-black text-slate-400 shrink-0">담당자</button>
+                <button onclick="setListTab('task')" id="tab-task" class="tab-btn px-4 py-2 text-sm font-black text-slate-400 shrink-0">업무기록</button>
+                <div class="flex-1"></div>
+                <button onclick="toggleSearch()" class="p-2 bg-slate-100 rounded-full text-slate-500"><i data-lucide="search" class="w-4 h-4"></i></button>
+            </div>
+            <div id="search-bar" class="hidden mb-4 animate-slide-up">
+                <input type="text" id="list-search-input" oninput="renderList()" placeholder="검색..." class="form-input">
+            </div>
+            <div id="list-content" class="space-y-3"></div>
+        </div>
+
+        <!-- To-Do View -->
+        <div id="view-todo" class="view-section hidden p-4">
+            <div class="mb-6">
+                <h3 class="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
+                    <i data-lucide="filter" class="w-5 h-5 text-indigo-500"></i> 업무 구분별 보기
+                </h3>
+                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2" id="todo-category-tabs">
+                    <button onclick="filterTodoCategory('전체')" class="cat-filter-btn active">전체</button>
+                    <button onclick="filterTodoCategory('진행')" class="cat-filter-btn">진행</button>
+                    <button onclick="filterTodoCategory('견적')" class="cat-filter-btn">견적</button>
+                    <button onclick="filterTodoCategory('도면')" class="cat-filter-btn">도면</button>
+                    <button onclick="filterTodoCategory('미팅')" class="cat-filter-btn">미팅</button>
+                    <button onclick="filterTodoCategory('할일')" class="cat-filter-btn">할일</button>
+                    <button onclick="filterTodoCategory('기타')" class="cat-filter-btn">기타</button>
+                </div>
+            </div>
+            <div id="todo-filtered-list" class="space-y-4 animate-slide-up"></div>
+        </div>
+    </main>
+
+    <!-- Day Details Modal -->
+    <div id="modal-day-details" class="fixed inset-0 bg-black/60 z-[200] hidden flex items-end">
+        <div class="bg-white w-full max-h-[95vh] rounded-t-[2.5rem] overflow-hidden flex flex-col animate-slide-up">
+            <div class="p-6 border-b border-slate-50 relative">
+                <div class="flex justify-center items-center gap-8">
+                    <button onclick="changeDay(-1)" class="date-nav-btn"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
+                    <div class="text-center min-w-[120px]">
+                        <h3 id="detail-date-title" class="text-xl font-black text-slate-800 tracking-tight leading-none">2024-05-20</h3>
+                        <p id="detail-day-name" class="text-[10px] font-bold text-indigo-500 mt-1 uppercase tracking-widest">Monday</p>
+                    </div>
+                    <button onclick="changeDay(1)" class="date-nav-btn"><i data-lucide="chevron-right" class="w-6 h-6"></i></button>
+                </div>
+                <button onclick="closeModal('modal-day-details')" class="absolute top-6 right-6 p-2 bg-slate-100 rounded-full"><i data-lucide="x" class="w-4 h-4 text-slate-500"></i></button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar">
+                <section>
+                    <h4 class="text-sm font-black text-slate-800 mb-4 flex items-center gap-2">
+                        <i data-lucide="calendar-check" class="w-4 h-4 text-indigo-500"></i> 오늘의 일정
+                    </h4>
+                    <div id="day-log-list" class="space-y-3"></div>
+                </section>
+                <section class="bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100/50">
+                    <h4 class="text-sm font-black text-indigo-600 mb-4 flex items-center gap-2"><i data-lucide="plus-circle" class="w-4 h-4"></i> 새 일정 등록</h4>
+                    <div id="log-form-container" class="space-y-4">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div><label class="form-label">현장명</label><input type="text" id="log-site" class="form-input"></div>
+                            <div><label class="form-label">업체명</label><input type="text" id="log-company" class="form-input"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div><label class="form-label">담당자</label><input type="text" id="log-manager" class="form-input"></div>
+                            <div><label class="form-label">구분</label>
+                                <select id="log-category" class="form-input">
+                                    <option value="진행">진행</option><option value="견적">견적</option><option value="도면">도면</option>
+                                    <option value="미팅">미팅</option><option value="할일">할일</option><option value="기타">기타</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div><label class="form-label">업무 내용</label><textarea id="log-content" class="w-full h-24 bg-white border border-indigo-100 rounded-xl p-3 text-sm outline-none resize-none"></textarea></div>
+                        <button onclick="saveLogFromModal()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black shadow-xl mt-2">일정 저장</button>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- Master Detail Modal -->
+    <div id="modal-master-detail" class="fixed inset-0 bg-black/60 z-[300] hidden flex items-end">
+        <div class="bg-white w-full max-h-[95vh] rounded-t-[2.5rem] overflow-hidden flex flex-col animate-slide-up">
+            <div class="p-6 border-b border-slate-50 flex justify-between items-center">
+                <h3 id="master-title" class="text-xl font-black text-slate-800">상세 정보</h3>
+                <button onclick="closeModal('modal-master-detail')" class="p-2 bg-slate-100 rounded-full"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <div id="master-detail-body" class="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar"></div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/90 backdrop-blur-xl border-t border-slate-100 flex justify-around py-4 z-[100]">
+        <button onclick="showView('calendar')" class="nav-btn flex flex-col items-center gap-1 text-indigo-600"><i data-lucide="calendar" class="w-5 h-5"></i><span class="text-[9px] font-black">달력</span></button>
+        <button onclick="showView('list', 'site')" class="nav-btn flex flex-col items-center gap-1 text-slate-400"><i data-lucide="hard-hat" class="w-5 h-5"></i><span class="text-[9px] font-black">현장</span></button>
+        <button onclick="showView('list', 'company')" class="nav-btn flex flex-col items-center gap-1 text-slate-400"><i data-lucide="building-2" class="w-5 h-5"></i><span class="text-[9px] font-black">업체</span></button>
+        <button onclick="showView('list', 'manager')" class="nav-btn flex flex-col items-center gap-1 text-slate-400"><i data-lucide="users" class="w-5 h-5"></i><span class="text-[9px] font-black">담당자</span></button>
+    </nav>
+    <div id="toast" class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur-md text-white px-8 py-3 rounded-full text-[11px] font-bold opacity-0 transition-all z-[300] pointer-events-none"></div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getDatabase, ref, onValue, update, remove, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    // GitHub/배포 환경 최적화: 환경 변수 누락 처리
+    let firebaseConfig;
+    try {
+        firebaseConfig = JSON.parse(__firebase_config);
+    } catch (e) {
+        console.error("Firebase Configuration is missing or invalid.");
+    }
+
+    if (firebaseConfig) {
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getDatabase(app);
+        const appId = (typeof __app_id !== 'undefined' ? __app_id : 'site-master-pro-v3').replace(/[\.\#\$\[\]]/g, '_');
+
+        let allData = { site: {}, company: {}, manager: {}, logs: {} };
+        let currentView = 'calendar';
+        let listTab = 'site';
+        let currentLogDate = new Date().toISOString().split('T')[0];
+        let currentMonth = new Date();
+        let selectedTodoCategory = '전체';
+
+        // 앱 구동 시 초기 인증 처리 (GitHub Pages 환경 대응)
+        onAuthStateChanged(auth, user => { 
+            if(user) {
+                initSync(); 
+            } else {
+                signInAnonymously(auth).catch(err => console.error("Auth failed:", err));
+            }
+        });
+
+        function initSync() {
+            const dataRef = ref(db, `artifacts/${appId}/public/data`);
+            onValue(dataRef, (snap) => {
+                const rawData = snap.val();
+                allData = {
+                    site: rawData?.site || {},
+                    company: rawData?.company || {},
+                    manager: rawData?.manager || {},
+                    logs: rawData?.logs || {}
+                };
+                refreshUI();
+            }, (error) => {
+                console.error("Database read error:", error);
+            });
+        }
+
+        function refreshUI() {
+            if(currentView === 'calendar') renderCalendar();
+            if(currentView === 'todo') renderTodoPage();
+            if(currentView === 'list') renderList();
+            lucide.createIcons();
+        }
+
+        // --- Core Functions Exposed to Global Scope ---
+
+        window.changeMonth = (dir) => { 
+            currentMonth.setMonth(currentMonth.getMonth() + dir); 
+            renderCalendar(); 
+        };
+        
+        window.renderCalendar = function() {
+            const container = document.getElementById('calendar-container');
+            const monthLabel = document.getElementById('calendar-month');
+            if (!container || !monthLabel) return;
+
+            container.innerHTML = '';
+            const year = currentMonth.getFullYear();
+            const month = currentMonth.getMonth();
+            monthLabel.innerText = `${year}년 ${month + 1}월`;
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const lastDate = new Date(year, month + 1, 0).getDate();
+            const prevLastDate = new Date(year, month, 0).getDate();
+
+            ['일','월','화','수','목','금','토'].forEach(d => {
+                const div = document.createElement('div');
+                div.className = "bg-slate-50/50 p-2 text-[9px] font-black text-center text-slate-400";
+                div.innerText = d; container.appendChild(div);
+            });
+
+            for(let i = firstDay; i > 0; i--) createDayCell(prevLastDate - i + 1, true);
+            for(let i = 1; i <= lastDate; i++) createDayCell(i, false);
+
+            function createDayCell(day, isOther) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const div = document.createElement('div');
+                div.className = `calendar-day ${isOther ? 'text-slate-200' : ''}`;
+                
+                if(!isOther && new Date().toDateString() === new Date(year, month, day).toDateString()) {
+                    div.classList.add('today');
+                }
+
+                const logsForDay = Object.values(allData.logs || {}).filter(l => l.date === dateStr);
+                
+                div.innerHTML = `
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-bold">${day}</span>
+                        <div class="flex gap-0.5">
+                            ${logsForDay.slice(0, 3).map(l => `<div class="w-1 h-1 rounded-full ${['견적','할일'].includes(l.category) ? 'bg-rose-400' : 'bg-indigo-400'}"></div>`).join('')}
+                        </div>
+                    </div>
+                    <div class="text-[8px] line-clamp-2 text-slate-500 leading-tight">${logsForDay[0]?.content || ''}</div>
+                `;
+                div.onclick = () => openDayDetails(dateStr);
+                container.appendChild(div);
+            }
+        };
+
+        window.openDayDetails = (dateStr) => {
+            currentLogDate = dateStr;
+            const titleEl = document.getElementById('detail-date-title');
+            const dayEl = document.getElementById('detail-day-name');
+            if(titleEl) titleEl.innerText = dateStr;
+            if(dayEl) dayEl.innerText = new Date(dateStr).toLocaleDateString('en-US', { weekday: 'long' });
+            
+            renderDayLogs(dateStr);
+            const modal = document.getElementById('modal-day-details');
+            if(modal) modal.classList.remove('hidden');
+            lucide.createIcons();
+        };
+
+        function renderDayLogs(dateStr) {
+            const container = document.getElementById('day-log-list');
+            if(!container) return;
+            container.innerHTML = '';
+            const logs = Object.values(allData.logs || {}).filter(l => l.date === dateStr);
+            
+            if(logs.length === 0) { 
+                container.innerHTML = `<div class="py-10 text-center text-slate-300 text-xs font-bold">일정이 없습니다.</div>`; 
+                return; 
+            }
+
+            logs.forEach(l => {
+                const div = document.createElement('div');
+                div.className = "bg-white p-4 rounded-2xl border border-slate-100 shadow-sm";
+                div.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[10px] font-black px-2 py-0.5 ${['견적','할일'].includes(l.category) ? 'bg-rose-50 text-rose-500' : 'bg-slate-50 text-slate-500'} rounded-lg">${l.category}</span>
+                        <button onclick="deleteLog('${l.id}')" class="text-slate-300 hover:text-rose-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </div>
+                    <div class="text-xs font-black text-slate-800 mb-1">${l.siteName || '-'} / ${l.companyName || '-'}</div>
+                    <p class="text-sm font-medium text-slate-600">${l.content}</p>
+                `;
+                container.appendChild(div);
+            });
+            lucide.createIcons();
+        }
+
+        window.saveLogFromModal = async () => {
+            const site = document.getElementById('log-site')?.value.trim();
+            const company = document.getElementById('log-company')?.value.trim();
+            const manager = document.getElementById('log-manager')?.value.trim();
+            const category = document.getElementById('log-category')?.value;
+            const content = document.getElementById('log-content')?.value.trim();
+            
+            if(!content) return showToast("내용을 입력하세요.");
+            
+            const id = Date.now().toString();
+            await set(ref(db, `artifacts/${appId}/public/data/logs/${id}`), { 
+                id, 
+                date: currentLogDate, 
+                siteName: site, 
+                companyName: company, 
+                managerName: manager, 
+                category, 
+                content, 
+                updatedAt: Date.now() 
+            });
+            
+            if(site) syncToMaster('site', site); 
+            if(company) syncToMaster('company', company); 
+            if(manager) syncToMaster('manager', manager);
+            
+            showToast("추가됨");
+            resetLogForm();
+            renderDayLogs(currentLogDate);
+        };
+
+        function resetLogForm() {
+            if(document.getElementById('log-site')) document.getElementById('log-site').value = '';
+            if(document.getElementById('log-company')) document.getElementById('log-company').value = '';
+            if(document.getElementById('log-manager')) document.getElementById('log-manager').value = '';
+            if(document.getElementById('log-category')) document.getElementById('log-category').value = '진행';
+            if(document.getElementById('log-content')) document.getElementById('log-content').value = '';
+        }
+
+        async function syncToMaster(type, name) {
+            const existing = Object.values(allData[type] || {}).find(i => i.name === name);
+            if(!existing) {
+                const newId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+                await set(ref(db, `artifacts/${appId}/public/data/${type}/${newId}`), { 
+                    id: newId, 
+                    name: name, 
+                    createdAt: Date.now(), 
+                    sortOrder: Date.now() 
+                });
+            }
+        }
+
+        window.deleteLog = async (id) => { 
+            if(confirm("삭제하시겠습니까?")) { 
+                await remove(ref(db, `artifacts/${appId}/public/data/logs/${id}`)); 
+                showToast("삭제됨");
+            } 
+        };
+
+        window.filterTodoCategory = (cat) => {
+            selectedTodoCategory = cat;
+            document.querySelectorAll('.cat-filter-btn').forEach(btn => btn.classList.toggle('active', btn.innerText === cat));
+            renderTodoPage();
+        };
+
+        window.renderTodoPage = function() {
+            const container = document.getElementById('todo-filtered-list');
+            if (!container) return;
+            container.innerHTML = '';
+            let logs = Object.values(allData.logs || {}).sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            if (selectedTodoCategory !== '전체') logs = logs.filter(l => l.category === selectedTodoCategory);
+            
+            if (logs.length === 0) {
+                container.innerHTML = `<div class="py-20 text-center"><p class="text-slate-400 font-bold text-sm">기록이 없습니다.</p></div>`;
+            } else {
+                logs.forEach(t => {
+                    const card = document.createElement('div');
+                    card.className = "bg-white p-5 rounded-2xl border border-slate-100 shadow-sm";
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] font-black text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-lg">${t.date}</span>
+                                <span class="text-[10px] font-black ${['할일','견적'].includes(t.category) ? 'text-rose-500 bg-rose-50' : 'text-slate-500 bg-slate-50'} px-2 py-0.5 rounded-lg">${t.category}</span>
+                            </div>
+                        </div>
+                        <h4 class="text-sm font-black text-slate-800 mb-1">${t.companyName || '-'}</h4>
+                        <p class="text-[11px] font-bold text-slate-400 mb-3">${t.siteName || '-'}</p>
+                        <div class="bg-slate-50/50 p-3 rounded-xl">
+                            <p class="text-xs font-medium text-slate-600">${t.content}</p>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            }
+            lucide.createIcons();
+        };
+
+        window.toggleTodoView = () => currentView !== 'todo' ? showView('todo') : showView('calendar');
+
+        window.showView = (v, tab) => {
+            currentView = v;
+            document.querySelectorAll('.view-section').forEach(s => s.classList.add('hidden'));
+            const viewEl = document.getElementById(`view-${v}`);
+            if(viewEl) viewEl.classList.remove('hidden');
+            
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                const label = btn.querySelector('span')?.innerText;
+                const matches = (v === 'calendar' && label === '달력') || 
+                              (tab === 'site' && label === '현장') ||
+                              (tab === 'company' && label === '업체') ||
+                              (tab === 'manager' && label === '담당자');
+                btn.classList.toggle('text-indigo-600', matches);
+                btn.classList.toggle('text-slate-400', !matches);
+            });
+            
+            if(tab) setListTab(tab);
+            refreshUI();
+        };
+
+        window.setListTab = (tab) => { 
+            listTab = tab; 
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.id === `tab-${tab}`)); 
+            renderList(); 
+        };
+
+        window.renderList = function() {
+            const container = document.getElementById('list-content');
+            if(!container) return;
+            const query = (document.getElementById('list-search-input')?.value || "").toLowerCase();
+            container.innerHTML = '';
+            
+            if(listTab === 'task') {
+                Object.values(allData.logs || {})
+                    .filter(t => (t.content||'').toLowerCase().includes(query))
+                    .sort((a,b)=>new Date(b.date)-new Date(a.date))
+                    .forEach(t => {
+                        const card = document.createElement('div');
+                        card.className = "bg-white p-4 rounded-2xl border border-slate-100";
+                        card.innerHTML = `<div class="text-[10px] font-bold text-slate-400 mb-1">${t.date}</div><div class="text-xs font-black text-slate-800">${t.siteName} / ${t.category}</div><p class="text-sm mt-1 text-slate-600">${t.content}</p>`;
+                        container.appendChild(card);
+                    });
+            } else {
+                Object.entries(allData[listTab] || {})
+                    .map(([id, item]) => ({ id, ...item }))
+                    .filter(item => (item.name || "").toLowerCase().includes(query))
+                    .sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0))
+                    .forEach(item => {
+                        const card = document.createElement('div');
+                        card.className = "bg-white p-5 rounded-2xl border border-slate-100 flex justify-between items-center cursor-pointer";
+                        card.innerHTML = `<h4 class="font-black text-sm text-slate-800">${item.name}</h4><i data-lucide="chevron-right" class="w-4 h-4 text-slate-200"></i>`;
+                        card.onclick = () => openMasterDetail(listTab, item.id);
+                        container.appendChild(card);
+                    });
+            }
+            lucide.createIcons();
+        };
+
+        window.handlePhotoUpload = (type, id, event) => {
+            const file = event.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                await update(ref(db, `artifacts/${appId}/public/data/${type}/${id}`), { photo: e.target.result });
+                openMasterDetail(type, id);
+            };
+            reader.readAsDataURL(file);
+        };
+
+        window.openMasterDetail = (type, id) => {
+            const item = allData[type][id];
+            if(!item) return;
+            const title = { site: '현장', company: '업체', manager: '담당자' }[type];
+            const titleEl = document.getElementById('master-title');
+            if(titleEl) titleEl.innerText = `${title} 상세 정보`;
+            const body = document.getElementById('master-detail-body');
+            if(!body) return;
+            
+            let detailHtml = `
+                <div class="space-y-4">
+                    <div><label class="form-label">명칭</label><input type="text" id="m-name" class="form-input" value="${item.name || ''}"></div>
+                    <div><label class="form-label">주소</label><input type="text" id="m-addr" class="form-input" value="${item.addr || ''}"></div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div><label class="form-label">담당자 1</label><input type="text" id="m-m1" class="form-input" value="${item.m1 || ''}"></div>
+                        <div><label class="form-label">전화번호</label><input type="text" id="m-tel" class="form-input" value="${item.tel || ''}"></div>
+                    </div>
+                    <div><label class="form-label">내용/메모</label><textarea id="m-memo" class="w-full h-24 bg-slate-50 rounded-xl p-3 text-sm border border-slate-100">${item.memo || ''}</textarea></div>
+                    
+                    <div>
+                        <label class="form-label">사진 / 그림</label>
+                        <div class="asset-box" onclick="document.getElementById('master-photo-input').click()">
+                            ${item.photo ? `<img src="${item.photo}">` : `<i data-lucide="camera" class="w-8 h-8 text-slate-300"></i><span class="text-[10px] text-slate-400 mt-2">터치하여 추가</span>`}
+                        </div>
+                        <input type="file" id="master-photo-input" class="hidden" accept="image/*" onchange="handlePhotoUpload('${type}', '${id}', event)">
+                    </div>
+
+                    <button onclick="saveMasterDetail('${type}', '${id}')" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black shadow-lg">기본정보 저장</button>
+                </div>
+            `;
+
+            if (type === 'site') {
+                detailHtml += renderGisungSection(id, item);
+                detailHtml += renderRelatedLogs(item.name);
+            } else {
+                detailHtml += renderRelatedSites(type, item.name);
+            }
+
+            body.innerHTML = detailHtml;
+            const modal = document.getElementById('modal-master-detail');
+            if(modal) modal.classList.remove('hidden');
+            lucide.createIcons();
+        };
+
+        function renderGisungSection(siteId, item) {
+            const renderRows = (data, keys, type) => {
+                let totalAmountSum = 0;
+                const rows = (data && Object.keys(data).length > 0) ? Object.entries(data).map(([rowId, row]) => {
+                    const currentTotal = (Number((row.qty||0).toString().replace(/,/g,'')) * Number((row.price||0).toString().replace(/,/g,''))) || Number((row.total||0).toString().replace(/,/g,'')) || 0;
+                    totalAmountSum += currentTotal;
+                    return `<tr>${keys.map(k => `<td class="table-cell"><input class="table-input" value="${k==='total'?currentTotal.toLocaleString():(row[k]||'')}" oninput="updateGisungRow('${siteId}', '${type}', '${rowId}', '${k}', this.value)"></td>`).join('')}<td class="table-cell"><button onclick="deleteGisungRow('${siteId}', '${type}', '${rowId}')" class="text-rose-400"><i data-lucide="minus-circle" class="w-3 h-3"></i></button></td></tr>`;
+                }).join('') : `<tr><td class="table-cell" colspan="${keys.length + 1}">데이터 없음</td></tr>`;
+                return rows + `<tr class="table-sum"><td class="table-cell text-[10px]">합계</td><td class="table-cell" colspan="2"></td><td class="table-cell font-black">${totalAmountSum.toLocaleString()}</td><td colspan="2"></td></tr>`;
+            };
+
+            const renderMaterialRows = (data) => {
+                 return (data && Object.keys(data).length > 0) ? Object.entries(data).map(([rowId, row]) => {
+                    return `<tr>
+                        <td class="table-cell"><input class="table-input" value="${row.item||''}" oninput="updateGisungRow('${siteId}', 'material', '${rowId}', 'item', this.value)"></td>
+                        <td class="table-cell"><input class="table-input" value="${row.month||''}" oninput="updateGisungRow('${siteId}', 'material', '${rowId}', 'month', this.value)"></td>
+                        <td class="table-cell"><input class="table-input" value="${row.inDate||''}" oninput="updateGisungRow('${siteId}', 'material', '${rowId}', 'inDate', this.value)"></td>
+                        <td class="table-cell"><input class="table-input" value="${row.outDate||''}" oninput="updateGisungRow('${siteId}', 'material', '${rowId}', 'outDate', this.value)"></td>
+                        <td class="table-cell"><input class="table-input" value="${row.etc||''}" oninput="updateGisungRow('${siteId}', 'material', '${rowId}', 'etc', this.value)"></td>
+                        <td class="table-cell"><button onclick="deleteGisungRow('${siteId}', 'material', '${rowId}')" class="text-rose-400"><i data-lucide="minus-circle" class="w-3 h-3"></i></button></td>
+                    </tr>`;
+                 }).join('') : `<tr><td class="table-cell" colspan="6">데이터 없음</td></tr>`;
+            };
+
+            return `
+                <div class="mt-8 space-y-8 border-t border-slate-100 pt-6">
+                    <section>
+                        <div class="flex justify-between items-center mb-3"><h4 class="text-sm font-black text-indigo-600">계약현황</h4><button onclick="addGisungRow('${siteId}', 'contract')" class="bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md text-[10px] font-black">+ 추가</button></div>
+                        <div class="overflow-x-auto rounded-xl border border-slate-100"><table class="w-full"><thead><tr><th class="table-header">항목</th><th class="table-header">수량</th><th class="table-header">단가</th><th class="table-header">금액</th><th class="table-header">비고</th><th class="table-header"></th></tr></thead><tbody>${renderRows(item.contract, ['item','qty','price','total','etc'], 'contract')}</tbody></table></div>
+                    </section>
+                    <section>
+                        <div class="flex justify-between items-center mb-3"><h4 class="text-sm font-black text-rose-600">청구현황</h4><button onclick="addGisungRow('${siteId}', 'request')" class="bg-rose-50 text-rose-600 px-2 py-1 rounded-md text-[10px] font-black">+ 추가</button></div>
+                        <div class="overflow-x-auto rounded-xl border border-slate-100"><table class="w-full"><thead><tr><th class="table-header">항목</th><th class="table-header">수량</th><th class="table-header">단가</th><th class="table-header">금액</th><th class="table-header">비고</th><th class="table-header"></th></tr></thead><tbody>${renderRows(item.request, ['item','qty','price','total','etc'], 'request')}</tbody></table></div>
+                    </section>
+                    <section>
+                        <div class="flex justify-between items-center mb-3"><h4 class="text-sm font-black text-emerald-600">자재현황</h4><button onclick="addGisungRow('${siteId}', 'material')" class="bg-emerald-50 text-emerald-600 px-2 py-1 rounded-md text-[10px] font-black">+ 추가</button></div>
+                        <div class="overflow-x-auto rounded-xl border border-slate-100"><table class="w-full"><thead><tr><th class="table-header">항목</th><th class="table-header">청구월</th><th class="table-header">투입일</th><th class="table-header">반납일</th><th class="table-header">비고</th><th class="table-header"></th></tr></thead><tbody>${renderMaterialRows(item.material)}</tbody></table></div>
+                    </section>
+                </div>
+            `;
+        }
+
+        function renderRelatedLogs(siteName) {
+            const logs = Object.values(allData.logs || {}).filter(l => l.siteName === siteName).sort((a,b)=>new Date(b.date)-new Date(a.date));
+            return `
+                <div class="mt-8 pt-6 border-t border-slate-100">
+                    <h4 class="text-sm font-black text-slate-800 mb-4 flex items-center gap-2"><i data-lucide="history" class="w-4 h-4"></i> 현장 업무 기록</h4>
+                    <div class="space-y-2">
+                        ${logs.length ? logs.map(l => `
+                            <div onclick="closeModal('modal-master-detail'); openDayDetails('${l.date}')" class="p-3 bg-slate-50 rounded-xl flex items-center gap-3 cursor-pointer">
+                                <span class="text-[10px] font-black text-indigo-500 shrink-0">${l.date}</span>
+                                <span class="text-xs text-slate-600 font-bold truncate">${l.content}</span>
+                            </div>
+                        `).join('') : '<p class="text-[10px] text-slate-400">기록이 없습니다.</p>'}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderRelatedSites(type, name) {
+            const field = type === 'company' ? 'companyName' : 'managerName';
+            const sites = [...new Set(Object.values(allData.logs || {}).filter(l => l[field] === name).map(l => l.siteName))];
+            return `
+                <div class="mt-8 pt-6 border-t border-slate-100">
+                    <h4 class="text-sm font-black text-slate-800 mb-4 flex items-center gap-2"><i data-lucide="map-pin" class="w-4 h-4"></i> 연결된 현장</h4>
+                    <div class="space-y-2">
+                        ${sites.length ? sites.map(s => `
+                            <div class="p-3 bg-slate-50 rounded-xl text-xs font-bold text-slate-600 flex items-center justify-between">
+                                ${s}
+                                <i data-lucide="link" class="w-3 h-3 text-slate-300"></i>
+                            </div>
+                        `).join('') : '<p class="text-[10px] text-slate-400">기록된 현장이 없습니다.</p>'}
+                    </div>
+                </div>
+            `;
+        }
+
+        window.addGisungRow = async (siteId, type) => {
+            const rowId = Date.now().toString();
+            const initial = type === 'material' ? { item:'', month:'', inDate:'', outDate:'', etc:'' } : { item:'', qty:0, price:0, total:0, etc:'' };
+            await set(ref(db, `artifacts/${appId}/public/data/site/${siteId}/${type}/${rowId}`), initial);
+            openMasterDetail('site', siteId);
+        };
+
+        window.updateGisungRow = (siteId, type, rowId, field, value) => {
+            update(ref(db, `artifacts/${appId}/public/data/site/${siteId}/${type}/${rowId}`), { [field]: value });
+        };
+
+        window.deleteGisungRow = async (siteId, type, rowId) => {
+            if(confirm("삭제하시겠습니까?")) { 
+                await remove(ref(db, `artifacts/${appId}/public/data/site/${siteId}/${type}/${rowId}`)); 
+                openMasterDetail('site', siteId); 
+            }
+        };
+
+        window.saveMasterDetail = async (type, id) => {
+            const payload = {
+                name: document.getElementById('m-name')?.value || "",
+                addr: document.getElementById('m-addr')?.value || "",
+                m1: document.getElementById('m-m1')?.value || "",
+                tel: document.getElementById('m-tel')?.value || "",
+                memo: document.getElementById('m-memo')?.value || "",
+                updatedAt: Date.now()
+            };
+            await update(ref(db, `artifacts/${appId}/public/data/${type}/${id}`), payload);
+            showToast("저장 완료");
+        };
+
+        window.closeModal = (id) => {
+            const el = document.getElementById(id);
+            if(el) el.classList.add('hidden');
+        };
+
+        window.toggleSearch = () => {
+            const bar = document.getElementById('search-bar');
+            if(bar) bar.classList.toggle('hidden');
+        };
+
+        function showToast(m) { 
+            const t=document.getElementById('toast'); 
+            if(!t) return;
+            t.innerText=m; 
+            t.style.opacity='1'; 
+            setTimeout(()=>t.style.opacity='0',2000); 
+        }
+
+        window.changeDay = (dir) => { 
+            const d = new Date(currentLogDate); 
+            d.setDate(d.getDate() + dir); 
+            openDayDetails(d.toISOString().split('T')[0]); 
+        };
+    }
+</script>
+</body>
+</html>
